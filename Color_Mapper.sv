@@ -17,57 +17,39 @@
 module  color_mapper (input logic Clk_optional,
                       input logic Reset,
                       input logic [9:0] DrawX, DrawY,
-                      input logic [31:0] draw_sig, //added
-                      input logic [7:0] draw_code, //added
+                      input logic [31:0] palette[8], //added //week2 8 32 bit arrays
+                      input logic [15:0] draw_code, //added
                       output logic [3:0]  Red, Green, Blue );
     
     logic ball_on;
-	 
- /* Old Ball: Generated square box by checking if the current pixel is within a square of length
-    2*BallS, centered at (BallX, BallY).  Note that this requires unsigned comparisons.
-	 
-    if ((DrawX >= BallX - Ball_size) &&
-       (DrawX <= BallX + Ball_size) &&
-       (DrawY >= BallY - Ball_size) &&
-       (DrawY <= BallY + Ball_size))
-       )
-
-     New Ball: Generates (pixelated) circle by using the standard circle formula.  Note that while 
-     this single line is quite powerful descriptively, it causes the synthesis tool to use up three
-     of the 120 available multipliers on the chip!  Since the multiplicants are required to be signed,
-	  we have to first cast them from logic to int (signed by default) before they are multiplied). */
-	  
     logic [10:0] sprite_addr;
     logic [7:0] sprite_data;
   
     font_rom fontrom(.addr(sprite_addr),
                      .data(sprite_data));
                      
-                        
-    always_comb
-    //always_ff @(posedge Clk_optional)
-    begin: Ball_on_proc
-        sprite_addr = (draw_code[6:0] << 4) + (DrawY & 10'b0000001111); //mod 16 is just masking out everything but [3:0], shift = *16
-    end
-    /*
-    [24:21] [20:17] [16:13] [12:9] [8:5] [4:1]
-    fgd_r   fgd_g   fgd_b   bkd_r  bkd_g bkd_b
-    */
-    always_comb
-    begin: RGB_display
-        if((sprite_data[7-DrawX[2:0]] == 1'b1 && draw_code[7] == 1'b0)
-            ||(sprite_data[7-DrawX[2:0]] == 1'b0 && draw_code[7] == 1'b1))
-        begin
-            Red = draw_sig[24:21];
-            Green = draw_sig[20:17];
-            Blue = draw_sig[16:13];
+    assign sprite_addr = (draw_code[14:8] << 4) + (DrawY & 10'b0000001111); //mod 16 is just masking out everything but [3:0], shift = *16
+    //lazy ahh
+    genvar i;
+    generate
+    for (i = 0; i < 8; i++) begin : palette_case
+        always_comb begin
+            if ((sprite_data[7 - DrawX[2:0]] != draw_code[15]) || (sprite_data[7 - DrawX[2:0]] != draw_code[15]))
+            begin
+                case (draw_code[7:4])
+                    4'b0000, 4'b0001 : {Red, Green, Blue} = {palette[i][11:8], palette[i][7:4], palette[i][3:0]};
+                    4'b0010, 4'b0011 : {Red, Green, Blue} = {palette[i][27:24], palette[i][23:20], palette[i][19:16]};
+                endcase
+            end
+            else
+            begin
+                case (draw_code[3:0])
+                    4'b0000, 4'b0001 : {Red, Green, Blue} = {palette[i][11:8], palette[i][7:4], palette[i][3:0]};
+                    4'b0010, 4'b0011 : {Red, Green, Blue} = {palette[i][27:24], palette[i][23:20], palette[i][19:16]};
+                endcase
+            end
         end
-        else
-        begin
-            Red = draw_sig[12:9];
-            Green = draw_sig[8:5];
-            Blue = draw_sig[4:1];
-        end
-        
     end
+endgenerate
+
 endmodule

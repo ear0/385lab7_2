@@ -10,7 +10,7 @@ module hdmi_text_controller_v2_0 #
 
     // Parameters of Axi Slave Bus Interface S00_AXI
     parameter integer C_AXI_DATA_WIDTH	= 32,
-    parameter integer C_AXI_ADDR_WIDTH	= 12 
+    parameter integer C_AXI_ADDR_WIDTH	= 14 //make 12 for week 1 functioanlity
 )
 (
     // Users to add ports here
@@ -52,13 +52,13 @@ module hdmi_text_controller_v2_0 #
 //ADDED SIGNALS FROM 6.2
     logic [C_AXI_ADDR_WIDTH - 3 :0] font_rom_addr;
     logic [C_AXI_DATA_WIDTH - 1 :0] font_rom_data;
-    logic [C_AXI_DATA_WIDTH - 1 :0] draw_sig;
+    logic [C_AXI_DATA_WIDTH - 1 :0] palette[8]; //has to become [31:0] palette[8]
     logic clk_25MHz, clk_125MHz, clk, clk_100MHz;
     logic hsync, vsync, vde;
     logic locked;
     logic [3:0] red, green, blue, red_int, green_int, blue_int;
     logic [9:0] drawX, drawY, ballxsig, ballysig, ballsizesig;
-    logic [7:0] draw_code;
+    logic [15:0] draw_code; //formerly 8 bits, extend to 16 for this lab
 //    assign ballxsig = 100; //hardcoded the ball stuff
 //    assign ballysig = 100;
 //    assign ballsizesig = 10;
@@ -91,7 +91,7 @@ hdmi_text_controller_v2_0_AXI # (
     //added these for font_rom drawing stuff
     ,.font_rom_addr(font_rom_addr)
     ,.font_rom_data(font_rom_data)
-    ,.draw_sig(draw_sig)
+    ,.palette(palette)
 );
 
 
@@ -143,8 +143,8 @@ hdmi_text_controller_v2_0_AXI # (
                     .Reset(),
                     .DrawX(drawX),
                     .DrawY(drawY)
-                    ,.draw_sig(draw_sig) //added for font draw
-                    ,.draw_code(draw_code) //added for font draw
+                    ,.palette(palette) //added for font draw // [31:0] palette[8] now.
+                    ,.draw_code(draw_code) //added for font draw //draw code remains the same.
                     ,.Red(red_int),
                     .Green(green_int),
                     .Blue(blue_int)

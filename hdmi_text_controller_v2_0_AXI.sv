@@ -35,13 +35,13 @@ module hdmi_text_controller_v2_0_AXI #
     parameter integer C_S_AXI_DATA_WIDTH	= 32,
     // Width of S_AXI address bus
     //changed to 12 from 4
-    parameter integer C_S_AXI_ADDR_WIDTH	= 12
+    parameter integer C_S_AXI_ADDR_WIDTH	= 14 //12 for week1
 )
 (
     // Users to add ports here
     input logic [C_S_AXI_ADDR_WIDTH - 3 :0] font_rom_addr,
     output logic [C_S_AXI_DATA_WIDTH - 1 :0] font_rom_data,
-    output logic [C_S_AXI_DATA_WIDTH - 1 :0] draw_sig,
+    output logic [C_S_AXI_DATA_WIDTH - 1 :0] palette[8], //becomes [31:0] palette[8], 8 32 bit arrays
     // User ports ends
     // Do not modify the ports beyond this line
 
@@ -125,8 +125,8 @@ logic  	axi_rvalid;
 // ADDR_LSB = 2 for 32 bits (n downto 2)
 // ADDR_LSB = 3 for 64 bits (n downto 3)
 localparam integer ADDR_LSB = (C_S_AXI_DATA_WIDTH/32) + 1;
-localparam integer OPT_MEM_ADDR_BITS = 9; //change to 6 for 64 reg for 601
-localparam integer reg_num = 601; //65 for 64 data regs + 1 control. 601 = 600 data + 1 control
+localparam integer OPT_MEM_ADDR_BITS = 11; //change to 6 for 64 reg for 601 // 11 for week2
+localparam integer reg_num = 1200; //65 for 64 data regs + 1 control. 601 = 600 data + 1 control //1200 week 2
 //9 because we extended the number of regs^^
 //----------------------------------------------
 //-- Signals for user logic register space example
@@ -398,29 +398,16 @@ logic [C_S_AXI_ADDR_WIDTH - 3:0] addra, addrb, write_addr, read_addr, addra_int;
 //logic [3:0] wea, web; // maybe these dont have to be byte enables... //[3:0]
 logic wea, web;
 logic [C_S_AXI_DATA_WIDTH - 1 : 0] din_int, dina, douta, dinb, doutb;
-logic [C_S_AXI_DATA_WIDTH - 1 :0] draw_sig_int;
+logic [C_S_AXI_DATA_WIDTH - 1 :0] palette_int[8];
 assign read_addr = S_AXI_ARADDR[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB];
 assign write_addr = S_AXI_AWADDR[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB];
 assign ena = 1'b1;
 assign enb = 1'b1;
 
-//always_ff @(posedge S_AXI_ACLK) begin : sketchy_load_din
-//    // if(write_addr < 'd600)
-//    if (slv_reg_wren) begin
-//        for (byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index + 1) begin
-//            if (S_AXI_WSTRB[byte_index] == 1) begin
-//                dina[(byte_index * 8) +: 8] <= S_AXI_WDATA[(byte_index * 8) +: 8];
-//                // draw_sig_int [(byte_index * 8) +: 8] <= S_AXI_WDATA[(byte_index * 8) +: 8];
-//            end else begin
-//                dina[(byte_index * 8) +: 8] <= douta[(byte_index * 8) +: 8];
-//            end
-//        end
-//    end
-//end
 always_ff @(posedge S_AXI_ACLK) begin
     if(slv_reg_wren) begin
         for (byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index + 1) begin
-            if(write_addr < 'd600) begin
+            if(write_addr < 'd1200) begin // 600 to 1200 for week2
                 if(S_AXI_WSTRB[byte_index]) begin
                     dina[(byte_index * 8) +: 8] <= S_AXI_WDATA[(byte_index * 8) +: 8];
                 end
@@ -429,7 +416,8 @@ always_ff @(posedge S_AXI_ACLK) begin
                 end
             end
             else begin
-                draw_sig_int [(byte_index * 8) +: 8] <= S_AXI_WDATA[(byte_index * 8) +: 8];
+                if (S_AXI_WSTRB[byte_index])
+                palette_int[write_addr[2:0]][(byte_index * 8) +: 8] <= S_AXI_WDATA[(byte_index * 8) +: 8];
             end
         end
     end
@@ -445,13 +433,13 @@ end
 
 always_ff @(posedge S_AXI_ACLK)
 begin
-    if(wea == 0 && slv_reg_wren && write_addr < 'd600)
-        wea <= 1'b1;
+    if(wea == 0 && slv_reg_wren && write_addr < 'd1200) //600 -> 1200 for week2
+        wea <= 1'b1; //1'b1
     else
         wea <= 0;
 end
 
-assign draw_sig = draw_sig_int;
+assign palette = palette_int;
 assign reg_data_out = douta;
 
 blk_mem_gen_0 bramski(.clka(S_AXI_ACLK),
@@ -462,7 +450,7 @@ blk_mem_gen_0 bramski(.clka(S_AXI_ACLK),
                       .douta(douta),
                       .clkb(S_AXI_ACLK),
                       .enb(enb), //no need
-                      .web(4'b0),
+                      .web(1'b0),
                       .addrb(font_rom_addr),
                       .dinb(32'b0),
                       .doutb(font_rom_data));
